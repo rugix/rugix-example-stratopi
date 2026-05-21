@@ -77,9 +77,3 @@ enabled = true
 enabled = true
 user = "root"
 """
-
-# Use the experimental container-bundled Rugix Ctrl binaries instead of the
-# latest GitHub release. The bsp target and a few other init/bootstrap bits
-# the dual-SD setup depends on are only available there.
-[parameters."core/rugix-ctrl"]
-version = "container"
