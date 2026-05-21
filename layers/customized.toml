@@ -34,20 +34,18 @@ recipes = [
     # Create /dev/stratopi/ device symlinks for SD card slots.
     "stratopi-max-normalized-devices",
 
-    ## Enable the following recipes for the nexigon integration.
-    ##
-    ## Requires configuration through .env.
+    ## Nexigon integration (requires configuration through .env).
 
     # Setup Nexigon Agent for Raspberry Pi.
-    # "nexigon/nexigon-agent-rpi",
+    "nexigon/nexigon-agent-rpi",
     # Setup Nexigon Agent.
-    # "nexigon/nexigon-agent",
+    "nexigon/nexigon-agent",
     # Configure Nexigon Agent.
-    # "nexigon/nexigon-agent-config",
+    "nexigon/nexigon-agent-config",
     # Power management commands.
-    # "nexigon/nexigon-power",
+    "nexigon/nexigon-power",
     # Systemd service management commands.
-    # "nexigon/nexigon-systemd",
+    "nexigon/nexigon-systemd",
 ]
 
 [parameters."core/set-hostname"]
@@ -67,21 +65,18 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH278KH3NlBdcPHk8XaTpZCG578JZ3WFjhifuic9FYJN
 # shipping anything that isn't a throwaway test unit.
 root_password = "rugix"
 
-## Parameters for the Nexigon recipes. Uncomment together with the
-## corresponding recipes above; the bakery rejects parameter blocks for
-## recipes that aren't part of the layer.
-# [parameters."nexigon/nexigon-agent"]
-# version = "v0.5"
-#
-# [parameters."nexigon/nexigon-agent-config"]
-# extra_config = """
-# [commands]
-# enabled = true
-#
-# [terminal]
-# enabled = true
-# user = "root"
-# """
+[parameters."nexigon/nexigon-agent"]
+version = "v0.5"
+
+[parameters."nexigon/nexigon-agent-config"]
+extra_config = """
+[commands]
+enabled = true
+
+[terminal]
+enabled = true
+user = "root"
+"""
 
 # Use the experimental container-bundled Rugix Ctrl binaries instead of the
 # latest GitHub release. The bsp target and a few other init/bootstrap bits
