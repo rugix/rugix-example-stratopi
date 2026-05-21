@@ -106,6 +106,24 @@ starts) the watchdog times out, the MCU power-cycles, and because
 way up. That card holds the previous, known-good system, so the device recovers
 without human intervention.
 
+> [!NOTE]
+> With the default `committed_sd_switch_config = 3`, watchdog-driven failover
+> stays armed *outside* of the update window too: three consecutive watchdog
+> resets with no heartbeat in between cause the MCU to swap to the other SD
+> card. This is a safety net for a wedged production system, not a free
+> rollback. For it to be useful, the application must take one of two
+> approaches:
+>
+> - **Mirror updates.** After a successful commit, also install the bundle to
+>   the spare card so both cards run the same version. A subsequent failover
+>   then boots an identical, known-healthy system.
+> - **Tolerate downgrade.** Accept that an unplanned failover may boot the
+>   *previous* version, and design the application (and any persistent state
+>   format) so that running an older release is safe.
+>
+> Setting `committed_sd_switch_config = 0` disables this post-commit safety net
+> entirely and matches Rugix's usual "no rollback after commit" model.
+
 The contract between layers: the watchdog service never touches
 `sd_switch_config`; the boot flow controller never touches `enabled`/`timeout`.
 Keeping those writes disjoint is what makes it safe to use the same hardware
