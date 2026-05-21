@@ -124,10 +124,15 @@ without human intervention.
 > Setting `committed_sd_switch_config = 0` disables this post-commit safety net
 > entirely and matches Rugix's usual "no rollback after commit" model.
 
-The contract between layers: the watchdog service never touches
-`sd_switch_config`; the boot flow controller never touches `enabled`/`timeout`.
-Keeping those writes disjoint is what makes it safe to use the same hardware
-watchdog for both ordinary liveness checks and A/B rollback.
+The contract between layers, *during an update*: whatever is currently kicking
+the watchdog (the shipped `kick-watchdog` timer in this template, or in
+production the user application that has taken over that job) never touches
+`sd_switch_config`, and the boot flow controller never touches
+`enabled`/`timeout`/`timeout_config`. Keeping those writes disjoint is what
+makes it safe to use the same hardware watchdog for both ordinary liveness
+checks and A/B rollback. Outside of an update window the application is free
+to drive the watchdog however it likes, including writing `sd_switch_config`,
+since no rollback is in flight.
 
 ### Application Responsibilities
 
