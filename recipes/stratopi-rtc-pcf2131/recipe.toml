@@ -2,4 +2,4 @@ description = "build and install the PCF2131 RTC driver and device tree overlay"
 
 [parameters]
 repo = { default = "https://github.com/sfera-labs/rtc-pcf2131.git" }
-branch = { default = "rpi-6.6.y" }
+branch = { default = "main" }

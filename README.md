@@ -199,7 +199,7 @@ device tree overlay, and patches config.txt on the boot partition.
 Parameters:
 
 - `repo`: RTC driver git repository (default: sfera-labs GitHub)
-- `branch`: git branch to build from (default: `rpi-6.6.y`)
+- `branch`: git branch to build from (default: `main`)
 
 ### stratopi-max-watchdog
 
