@@ -67,18 +67,21 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH278KH3NlBdcPHk8XaTpZCG578JZ3WFjhifuic9FYJN
 # shipping anything that isn't a throwaway test unit.
 root_password = "rugix"
 
-[parameters."nexigon/nexigon-agent"]
-version = "v0.5"
-
-[parameters."nexigon/nexigon-agent-config"]
-extra_config = """
-[commands]
-enabled = true
-
-[terminal]
-enabled = true
-user = "root"
-"""
+## Parameters for the Nexigon recipes. Uncomment together with the
+## corresponding recipes above; the bakery rejects parameter blocks for
+## recipes that aren't part of the layer.
+# [parameters."nexigon/nexigon-agent"]
+# version = "v0.5"
+#
+# [parameters."nexigon/nexigon-agent-config"]
+# extra_config = """
+# [commands]
+# enabled = true
+#
+# [terminal]
+# enabled = true
+# user = "root"
+# """
 
 # Use the experimental container-bundled Rugix Ctrl binaries instead of the
 # latest GitHub release. The bsp target and a few other init/bootstrap bits
