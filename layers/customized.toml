@@ -9,6 +9,8 @@ recipes = [
     "core/persist-root-home",
     # Setup and enable SSH.
     "core/ssh",
+    # Enable root login with password authentication (demo image only).
+    "demo-ssh-root",
     # Setup the network.
     "rugix-extra/debian-setup-network",
     # Setup the time synchronization.
@@ -53,6 +55,11 @@ autoremove = true
 root_authorized_keys = """
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH278KH3NlBdcPHk8XaTpZCG578JZ3WFjhifuic9FYJN koehlma@photon
 """
+
+[parameters."demo-ssh-root"]
+# Plaintext root password baked into the demo image. Change or clear before
+# shipping anything that isn't a throwaway test unit.
+root_password = "rugix"
 
 [parameters."nexigon/nexigon-agent"]
 version = "v0.5"

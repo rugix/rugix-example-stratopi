@@ -1,0 +1,8 @@
+description = "enable root SSH login with password authentication for the demo image"
+dependencies = ["core/ssh"]
+
+[parameters]
+# Password to set for the root account. Leave empty to keep whatever password
+# (or locked account) the base image ships with. Plaintext; baked into the
+# image, so do not use a password you care about.
+root_password = { default = "" }
