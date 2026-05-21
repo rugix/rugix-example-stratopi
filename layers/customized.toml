@@ -13,6 +13,8 @@ recipes = [
     "demo-ssh-root",
     # Install common CLI tools (git, wget) for the demo image.
     "demo-basic-tools",
+    # Install Podman so rugix-bakery can run on-device.
+    "demo-podman",
     # Setup the network.
     "rugix-extra/debian-setup-network",
     # Setup the time synchronization.
