@@ -7,3 +7,10 @@ dependencies = ["stratopi-max-normalized-devices"]
 # it to this size on first boot, then adds the data partition behind it
 # in whatever space remains on the physical SD card.
 system_size = { default = "2GiB" }
+
+# Value the boot flow writes to `watchdog/sd_switch_config` on commit, i.e.
+# the number of consecutive watchdog resets (with no heartbeat in between)
+# that the MCU tolerates before swapping the SD routing. `0` disables
+# watchdog-driven failover outside of the update window; `1` swaps on every
+# reset; `N > 1` swaps after N consecutive resets.
+committed_sd_switch_config = { default = "3" }

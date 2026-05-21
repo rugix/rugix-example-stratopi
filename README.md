@@ -94,8 +94,11 @@ A successful update walks through five steps:
    and powers the CM back on from the new card.
 5. **`commit`**: once the new system has booted far enough to run the boot flow
    controller, it writes the active letter back to `sd_main_routing_config` and
-   sets `watchdog/sd_switch_config` to its committed value (`0` by default,
-   disabling watchdog-driven failover until the next update window).
+   sets `watchdog/sd_switch_config` to its committed value (`3` by default,
+   so the MCU swaps the SD routing after three consecutive watchdog resets
+   with no heartbeat in between). The committed value is configurable via the
+   `committed_sd_switch_config` recipe parameter; setting it to `0` disables
+   watchdog-driven failover outside of the update window.
 
 If steps 4 and 5 don't complete (kernel panic, init failure, the OTA service never
 starts) the watchdog times out, the MCU power-cycles, and because
@@ -219,6 +222,16 @@ The boot flow controller communicates with the MCU via sysfs to:
 - Arm the watchdog for rollback on update
 - Trigger MCU power cycles to switch cards
 - Commit successful boots by disarming the watchdog
+
+Parameters:
+
+- `system_size`: target size of the system partition, grown on first boot
+  (default: `2GiB`)
+- `committed_sd_switch_config`: value written to `watchdog/sd_switch_config`
+  on commit, i.e. the number of consecutive watchdog resets the MCU
+  tolerates before swapping the SD routing outside of the update window.
+  `0` disables watchdog-driven failover, `1` swaps on every reset, `N > 1`
+  swaps after N consecutive resets (default: `3`)
 
 Depends on `stratopi-max-normalized-devices`.
 

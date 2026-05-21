@@ -27,8 +27,9 @@ POWER_DOWN_ENABLED="$SYSFS_BASE/power/down_enabled"
 # Value to write to watchdog/sd_switch_config on commit. 0 disables watchdog-
 # driven failover entirely after the update window. Set this to a value > 1
 # to keep delayed failover armed in production (swap after N consecutive
-# watchdog resets with no heartbeat in between).
-COMMITTED_WATCHDOG_SD_SWITCH=0
+# watchdog resets with no heartbeat in between). Baked in from the
+# `committed_sd_switch_config` recipe parameter.
+COMMITTED_WATCHDOG_SD_SWITCH=@COMMITTED_SD_SWITCH_CONFIG@
 
 cmd="${1:-}"
 group="${2:-}"
