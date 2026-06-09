@@ -266,7 +266,70 @@ RUGIX_VERSION=branch-main ./run-bakery bake bundle <system>
 
 The built image and update bundle will be in `build/`.
 
-If you uncomment any of the optional `nexigon/*` recipes in
-`layers/customized.toml`, copy `env.template` to `.env` first and fill in the
-matching values. The `nexigon-agent-config` recipe sources `.env` at bake time
-to bake `NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into `/etc/nexigon/agent.toml`.
+Available systems are:
+
+- `rpi-tryboot`
+- `rpi-tryboot-pi4`
+- `stratopi-dual-sd`
+
+The Nexigon agent recipes in `layers/customized.toml` require configuration.
+Copy `env.template` to `.env` first and fill in the matching values. The
+`nexigon-agent-config` recipe sources `.env` at bake time to bake
+`NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into `/etc/nexigon/agent.toml`.
+
+## Nexigon Releases
+
+The release scripts are based on the Nexigon Rugix template and share state
+through `.release-env`, so the generated version is used consistently by each
+step.
+
+1. Configure `.env`:
+
+   ```
+   NEXIGON_HUB_URL="https://eu.nexigon.cloud"
+   NEXIGON_TOKEN=<device-deployment-token>
+   NEXIGON_REPOSITORY=<repository-id>
+   NEXIGON_PACKAGE=<package-name>
+   ```
+
+2. Prepare the Nexigon package version:
+
+   ```
+   ./scripts/prepare-release.sh
+   ```
+
+   This creates or reuses a version tagged as `build-<timestamp>-<commit>` and
+   writes `.release-env`.
+
+3. Build one or more systems with the pinned release version:
+
+   ```
+   ./scripts/build-release.sh rpi-tryboot rpi-tryboot-pi4 stratopi-dual-sd
+   ```
+
+   Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
+   and build info in `build/<system>/`. The system image is compressed to
+   `system.img.xz`.
+
+4. Upload all build artifacts to Nexigon:
+
+   ```
+   ./scripts/upload-release.sh
+   ```
+
+   The upload step checks `system-build-info.json` before publishing so stale
+   builds are not attached to the wrong Nexigon version.
+
+5. Promote the current branch build to the stable tag:
+
+   ```
+   ./scripts/stabilize-release.sh
+   ```
+
+The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
+if the CLI is not on `PATH`.
+
+The scripts publish OTA-ready bundles, but they do not enable device-side
+polling or automatic installation. If you want devices to poll Nexigon and
+install `stable` automatically, review the `nexigon/nexigon-rugix-ota` recipe
+and its commit policy before enabling it.
