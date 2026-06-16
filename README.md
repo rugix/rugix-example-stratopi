@@ -4,7 +4,7 @@ Rugix Bakery template for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max
 family of edge servers. Builds ready-to-flash images with over-the-air update
 support via [Rugix](https://rugix.org).
 
-> [!INFO]
+> [!NOTE]
 > This template is a proof of concept demonstrating how to integrate Rugix with
 > Strato Pi's dual SD card switching mechanism and watchdog. If you're interested
 > in using this in production please contact [Silitics](https://silitics.com).
