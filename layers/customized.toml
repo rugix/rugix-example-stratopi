@@ -46,6 +46,8 @@ recipes = [
     "nexigon/nexigon-power",
     # Systemd service management commands.
     "nexigon/nexigon-systemd",
+    # Nexigon Rugix OTA Service.
+    "nexigon/nexigon-rugix-ota",
 ]
 
 [parameters."core/set-hostname"]

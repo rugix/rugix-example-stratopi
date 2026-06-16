@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Boot flow controller and the runtime Rugix system configuration.
 mkdir -p /usr/lib/stratopi
-sed "s|@COMMITTED_SD_SWITCH_CONFIG@|${RECIPE_PARAM_COMMITTED_SD_SWITCH_CONFIG}|g" \
+sed "s|@WATCHDOG_SD_SWITCH_CONFIG@|${RECIPE_PARAM_WATCHDOG_SD_SWITCH_CONFIG}|g" \
     "${RECIPE_DIR}/files/boot-flow" \
     > /usr/lib/stratopi/boot-flow
 chmod 755 /usr/lib/stratopi/boot-flow

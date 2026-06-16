@@ -4,13 +4,16 @@ Rugix Bakery template for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max
 family of edge servers. Builds ready-to-flash images with over-the-air update
 support via [Rugix](https://rugix.org).
 
-> [!WARNING]
-> This implementation is **experimental and under active development**.
+> [!INFO]
+> This template is a proof of concept demonstrating how to integrate Rugix with
+> Strato Pi's dual SD card switching mechanism and watchdog. If you're interested
+> in using this in production please contact [Silitics](https://silitics.com).
 
 ## System Images
 
 The template provides two system image types targeting different update
-strategies. Both share a common base layer with the Strato Pi Max kernel module,
+strategies: Raspberry Pi's tryboot mechanism and Strato Pi's dual SD card
+failover. Both share a common base layer with the Strato Pi Max kernel module,
 PCF2131 RTC driver, watchdog, power-cycle reboot helper, and device
 normalization recipes.
 
@@ -20,26 +23,27 @@ Uses the Raspberry Pi tryboot mechanism for A/B updates on a single boot medium
 (SD card, eMMC, or NVMe SSD). The secondary SD card slot or an attached SSD can
 be used for persistent data.
 
-This is the simpler setup and works with any Strato Pi Max variant. Two system
-targets are available: `rpi-tryboot` for Pi 5, Pi 4, and CM4 with recent
-firmware, and `rpi-tryboot-pi4` which additionally bundles a firmware update
-for older Pi 4 / CM4 units that need it.
+This is the simpler setup and works with any Strato Pi Max variant with a recent
+firmware (at least `2023-05-11`). Make sure your unit has a recent firmware
+installed before flashing the image.
 
-The MCU watchdog provides recovery: if an update fails to boot and send
-heartbeats, the watchdog triggers a power cycle and the tryboot mechanism rolls
-back to the previous system.
+With this image the MCU watchdog provides recovery during an update: if an update
+fails to boot and send heartbeats, the watchdog triggers a power cycle and the
+tryboot mechanism rolls back to the previous system. After an update has been
+committed, the watchdog can only reset the system but not trigger a fallback
+to the previous version.
 
 ### Dual SD Card
 
-Leverages the Strato Pi Max's dual SD card switching matrix for full A/B
-redundancy. Each SD card holds a complete system. The MCU controls which card is
-routed to the CM at boot, and the custom boot flow controller talks to the MCU
-to coordinate updates and rollbacks.
+Leverages the Strato Pi Max's dual SD card switching matrix for full A/B boot
+medium redundancy with automated failover. Each SD card holds a complete system.
+The MCU controls which card is routed to the CM at boot, and the custom boot flow
+controller talks to the MCU to coordinate updates and rollbacks.
 
 On update, the new image is written to the inactive SD card. The boot flow
 arms the watchdog for rollback, switches the SD routing, and triggers a power
-cycle. If the new system boots successfully and commits, the switch is permanent.
-If the watchdog expires, the MCU automatically reverts to the previous card.
+cycle. If the new system boots successfully, the switch is permanent. If the
+watchdog expires, the MCU automatically reverts to the other card.
 
 This setup requires the `stratopi-max-dual-sd-boot` recipe and uses a custom Rugix
 system configuration with `boot-flow.type = "custom"`.
@@ -72,10 +76,6 @@ MCU power-cycles the CM after `timeout + down_delay_config` seconds.
 > a dependent service's status), so that a wedged application, not just a
 > wedged kernel, also triggers recovery.
 
-The dual-SD boot flow piggy-backs on the watchdog: by toggling `sd_switch_config`,
-the controller turns the same hardware safety net into the rollback mechanism for
-A/B updates (see below).
-
 ### Update Flow (Dual SD)
 
 A successful update walks through five steps:
@@ -87,52 +87,36 @@ A successful update walks through five steps:
    step 3.
 2. **Bundle write**: `rugix-ctrl` writes the new system to the inactive group's
    block device (the SD card *not* currently routed as main).
-3. **`set_try_next`**: set `watchdog/sd_switch_config = 1` (arm rollback) and
-   write the target letter to `sd/sd_main_routing_config`.
+3. **`set_try_next`**: set `watchdog/sd_switch_config = N` (arm rollback) and
+   write the target letter to `sd/sd_main_routing_config`. Here `N` is configurable
+   through the `watchdog_sd_switch_config` parameter (default: `3`).
 4. **`reboot`**: write `1` to `power/down_enabled` and `shutdown now`. The MCU
    waits `down_delay_config` seconds, cuts power, applies `sd_main_routing_config`,
    and powers the CM back on from the new card.
-5. **`commit`**: once the new system has booted far enough to run the boot flow
-   controller, it writes the active letter back to `sd_main_routing_config` and
-   sets `watchdog/sd_switch_config` to its committed value (`3` by default,
-   so the MCU swaps the SD routing after three consecutive watchdog resets
-   with no heartbeat in between). The committed value is configurable via the
-   `committed_sd_switch_config` recipe parameter; setting it to `0` disables
-   watchdog-driven failover outside of the update window.
+5. The system comes back up and starts kicking the watchdog.
 
-If steps 4 and 5 don't complete (kernel panic, init failure, the OTA service never
-starts) the watchdog times out, the MCU power-cycles, and because
-`watchdog/sd_switch_config` is still `1` it routes to the *other* card on the
-way up. That card holds the previous, known-good system, so the device recovers
-without human intervention.
+If steps 4 and 5 don't complete (kernel panic, init failure, etc.) the watchdog
+times out, the MCU power-cycles, and remembers that the boot failed. After `N`
+consecutive failures it triggers the fallback to the previous, known-good version,
+so the device recovers without human intervention.
 
 > [!NOTE]
-> With the default `committed_sd_switch_config = 3`, watchdog-driven failover
+> With the default `watchdog_sd_switch_config = 3`, watchdog-driven failover
 > stays armed *outside* of the update window too: three consecutive watchdog
 > resets with no heartbeat in between cause the MCU to swap to the other SD
 > card. This is a safety net for a wedged production system, not a free
 > rollback. For it to be useful, the application must take one of two
 > approaches:
 >
-> - **Mirror updates.** After a successful commit, also install the bundle to
+> - **Mirror updates.** After a successful update, also install the bundle to
 >   the spare card so both cards run the same version. A subsequent failover
 >   then boots an identical, known-healthy system.
 > - **Tolerate downgrade.** Accept that an unplanned failover may boot the
 >   *previous* version, and design the application (and any persistent state
 >   format) so that running an older release is safe.
 >
-> Setting `committed_sd_switch_config = 0` disables this post-commit safety net
-> entirely and matches Rugix's usual "no rollback after commit" model.
-
-The contract between layers, *during an update*: whatever is currently kicking
-the watchdog (the shipped `kick-watchdog` timer in this template, or in
-production the user application that has taken over that job) never touches
-`sd_switch_config`, and the boot flow controller never touches
-`enabled`/`timeout`/`timeout_config`. Keeping those writes disjoint is what
-makes it safe to use the same hardware watchdog for both ordinary liveness
-checks and A/B rollback. Outside of an update window the application is free
-to drive the watchdog however it likes, including writing `sd_switch_config`,
-since no rollback is in flight.
+> Setting `watchdog_sd_switch_config = 0` disables this safety net entirely and
+> matches Rugix's usual "no rollback after commit" model.
 
 ### Application Responsibilities
 
@@ -145,21 +129,6 @@ application running on the device:
   `rugix-ctrl update install <bundle-url>`. Without an OTA recipe enabled,
   nothing on the device calls this on its own; the application (or an
   operator) decides when to fetch and install a bundle.
-- **Committing the new system.** After step 4, the new system boots in a
-  tentative state: `watchdog/sd_switch_config` is still armed, and a
-  watchdog timeout will roll back to the previous card. The application
-  is responsible for deciding what "healthy" means (services up, data
-  paths working, self-checks green) and only then calling
-  `rugix-ctrl system commit` to disarm the rollback (step 5). Until that
-  call, the safety net stays up.
-
-  If the application is not healthy, it
-  must *also* stop kicking the watchdog (or trigger a power cycle in some other way). Otherwise, the new system stays
-  up indefinitely with the rollback armed but never triggered. The
-  intended pattern is: kick only while the application is healthy, and
-  commit only once it's been healthy long enough to trust. An unhealthy
-  application that stops kicking will let the watchdog time out, the
-  MCU will power-cycle, and the rollback fires automatically.
 - **Forcing a rollback.** If the application determines the new system is
   *not* healthy and can't be salvaged, it can short-circuit the watchdog
   by calling `rugix-ctrl system reboot --spare` to immediately reboot
@@ -170,6 +139,86 @@ application running on the device:
   healthy. That way a wedged workload, not just a wedged kernel,
   triggers a watchdog-driven reboot (and, during an update window, a
   rollback).
+
+## Building
+
+```
+RUGIX_VERSION=branch-main ./run-bakery bake bundle <system>
+```
+
+The built image and update bundle will be in `build/`.
+
+Available systems are:
+
+- `rpi-tryboot`
+- `stratopi-dual-sd`
+
+## Nexigon Integration
+
+For fleet-wide update orchestration this template ships with a ready-made
+[Nexigon](https://nexigon.cloud) integration.
+
+The Nexigon agent recipes in `layers/customized.toml` require configuration.
+Copy `env.template` to `.env` first and fill in the matching values. The
+`nexigon-agent-config` recipe sources `.env` at bake time to bake
+`NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into `/etc/nexigon/agent.toml`.
+
+### Nexigon Releases
+
+The release scripts are based on the Nexigon Rugix template and share state
+through `.release-env`, so the generated version is used consistently by each
+step.
+
+1. Configure `.env`:
+
+   ```
+   NEXIGON_HUB_URL="https://eu.nexigon.cloud"
+   NEXIGON_TOKEN=<device-deployment-token>
+   NEXIGON_REPOSITORY=<repository-id>
+   NEXIGON_PACKAGE=<package-name>
+   ```
+
+2. Prepare the Nexigon package version:
+
+   ```
+   ./scripts/prepare-release.sh
+   ```
+
+   This creates or reuses a version tagged as `build-<timestamp>-<commit>` and
+   writes `.release-env`.
+
+3. Build one or more systems with the pinned release version:
+
+   ```
+   ./scripts/build-release.sh rpi-tryboot rpi-tryboot-pi4 stratopi-dual-sd
+   ```
+
+   Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
+   and build info in `build/<system>/`. The system image is compressed to
+   `system.img.xz`.
+
+4. Upload all build artifacts to Nexigon:
+
+   ```
+   ./scripts/upload-release.sh
+   ```
+
+   The upload step checks `system-build-info.json` before publishing so stale
+   builds are not attached to the wrong Nexigon version.
+
+5. Promote the current branch build to the stable tag:
+
+   ```
+   ./scripts/stabilize-release.sh
+   ```
+
+The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
+if the CLI is not on `PATH`.
+
+The scripts publish OTA-ready bundles, but they do not enable device-side
+polling or automatic installation. If you want devices to poll Nexigon and
+install `stable` automatically, review the `nexigon/nexigon-rugix-ota` recipe
+and its commit policy before enabling it.
 
 ## Recipes
 
@@ -250,86 +299,9 @@ Parameters:
 
 - `system_size`: target size of the system partition, grown on first boot
   (default: `2GiB`)
-- `committed_sd_switch_config`: value written to `watchdog/sd_switch_config`
-  on commit, i.e. the number of consecutive watchdog resets the MCU
-  tolerates before swapping the SD routing outside of the update window.
-  `0` disables watchdog-driven failover, `1` swaps on every reset, `N > 1`
-  swaps after N consecutive resets (default: `3`)
+- `watchdog_sd_switch_config`: value written to `watchdog/sd_switch_config`
+  as part of an update, i.e. the number of consecutive watchdog resets the MCU
+  tolerates before swapping the SD routing. This MUST be `>0` to ensure that
+  a bad update triggers a fallback to the old version.
 
 Depends on `stratopi-max-normalized-devices`.
-
-## Building
-
-```
-RUGIX_VERSION=branch-main ./run-bakery bake bundle <system>
-```
-
-The built image and update bundle will be in `build/`.
-
-Available systems are:
-
-- `rpi-tryboot`
-- `rpi-tryboot-pi4`
-- `stratopi-dual-sd`
-
-The Nexigon agent recipes in `layers/customized.toml` require configuration.
-Copy `env.template` to `.env` first and fill in the matching values. The
-`nexigon-agent-config` recipe sources `.env` at bake time to bake
-`NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into `/etc/nexigon/agent.toml`.
-
-## Nexigon Releases
-
-The release scripts are based on the Nexigon Rugix template and share state
-through `.release-env`, so the generated version is used consistently by each
-step.
-
-1. Configure `.env`:
-
-   ```
-   NEXIGON_HUB_URL="https://eu.nexigon.cloud"
-   NEXIGON_TOKEN=<device-deployment-token>
-   NEXIGON_REPOSITORY=<repository-id>
-   NEXIGON_PACKAGE=<package-name>
-   ```
-
-2. Prepare the Nexigon package version:
-
-   ```
-   ./scripts/prepare-release.sh
-   ```
-
-   This creates or reuses a version tagged as `build-<timestamp>-<commit>` and
-   writes `.release-env`.
-
-3. Build one or more systems with the pinned release version:
-
-   ```
-   ./scripts/build-release.sh rpi-tryboot rpi-tryboot-pi4 stratopi-dual-sd
-   ```
-
-   Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
-   and build info in `build/<system>/`. The system image is compressed to
-   `system.img.xz`.
-
-4. Upload all build artifacts to Nexigon:
-
-   ```
-   ./scripts/upload-release.sh
-   ```
-
-   The upload step checks `system-build-info.json` before publishing so stale
-   builds are not attached to the wrong Nexigon version.
-
-5. Promote the current branch build to the stable tag:
-
-   ```
-   ./scripts/stabilize-release.sh
-   ```
-
-The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
-if the CLI is not on `PATH`.
-
-The scripts publish OTA-ready bundles, but they do not enable device-side
-polling or automatic installation. If you want devices to poll Nexigon and
-install `stable` automatically, review the `nexigon/nexigon-rugix-ota` recipe
-and its commit policy before enabling it.

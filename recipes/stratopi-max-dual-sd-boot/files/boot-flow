@@ -6,13 +6,6 @@
 # to /sys/class/stratopimax. Each Rugix boot group corresponds to one of the
 # two physical SD card slots; the Strato Pi MCU decides which one is routed
 # to the CM via its switching matrix.
-#
-# The controller uses `watchdog/sd_switch_config` itself as the persistent
-# indicator of whether the current routing is tentative:
-#
-#     watchdog/sd_switch_config == 1  ->  tentative; watchdog will roll back
-#     watchdog/sd_switch_config != 1  ->  committed; either no failover (0)
-#                                         or delayed failover (N > 1)
 
 set -euo pipefail
 
@@ -21,16 +14,14 @@ SYSFS_BASE="/sys/class/stratopimax"
 SD_MAIN_ROUTING="$SYSFS_BASE/sd/sd_main_routing"
 SD_MAIN_ROUTING_CONFIG="$SYSFS_BASE/sd/sd_main_routing_config"
 WATCHDOG_ENABLED="$SYSFS_BASE/watchdog/enabled"
+WATCHDOG_ENABLED_CONFIG="$SYSFS_BASE/watchdog/enabled_config"
 WATCHDOG_SD_SWITCH="$SYSFS_BASE/watchdog/sd_switch_config"
 POWER_SD_SWITCH="$SYSFS_BASE/power/sd_switch_config"
 POWER_DOWN_ENABLED="$SYSFS_BASE/power/down_enabled"
 
-# Value to write to watchdog/sd_switch_config on commit. 0 disables watchdog-
-# driven failover entirely after the update window. Set this to a value > 1
-# to keep delayed failover armed in production (swap after N consecutive
-# watchdog resets with no heartbeat in between). Baked in from the
-# `committed_sd_switch_config` recipe parameter.
-COMMITTED_WATCHDOG_SD_SWITCH=@COMMITTED_SD_SWITCH_CONFIG@
+# Value to write to watchdog/sd_switch_config. Baked in from the
+# `watchdog_sd_switch_config` recipe parameter.
+WATCHDOG_SD_SWITCH_CONFIG=@WATCHDOG_SD_SWITCH_CONFIG@
 
 cmd="${1:-}"
 group="${2:-}"
@@ -69,8 +60,8 @@ current_routing_group() {
     routing_to_group "$(< "$SD_MAIN_ROUTING")"
 }
 
-is_tentative() {
-    [[ "$(tr -d '[:space:]' < "$WATCHDOG_SD_SWITCH")" = 1 ]]
+current_routing_group_config() {
+    routing_to_group "$(< "$SD_MAIN_ROUTING_CONFIG")"
 }
 
 case "$cmd" in
@@ -79,29 +70,22 @@ case "$cmd" in
         ;;
 
     get_default)
-        active=$(current_routing_group)
-        if is_tentative; then
-            printf '{"group":"%s"}\n' "$(other_group "$active")"
-        else
-            printf '{"group":"%s"}\n' "$active"
-        fi
+        printf '{"group":"%s"}\n' "$(current_routing_group_config)"
         ;;
 
     set_try_next)
         [[ -n $group ]] || { echo "set_try_next requires a group" >&2; exit 1; }
         # Arm watchdog rollback, then point the matrix at the target. The
         # MCU will honour sd_main_routing_config on the next power cycle.
-        printf '1\n' > "$WATCHDOG_SD_SWITCH"
+        printf '%s\n' "$WATCHDOG_SD_SWITCH_CONFIG" > "$WATCHDOG_SD_SWITCH"
         group_to_routing "$group" > "$SD_MAIN_ROUTING_CONFIG"
         printf '{}\n'
         ;;
 
     commit)
         [[ -n $group ]] || { echo "commit requires a group" >&2; exit 1; }
-        # Make the configured routing match the active group, in case we got
-        # here via a watchdog rollback rather than a successful try-next.
         group_to_routing "$group" > "$SD_MAIN_ROUTING_CONFIG"
-        printf '%s\n' "$COMMITTED_WATCHDOG_SD_SWITCH" > "$WATCHDOG_SD_SWITCH"
+        printf '%s\n' "$WATCHDOG_SD_SWITCH_CONFIG" > "$WATCHDOG_SD_SWITCH"
         printf '{}\n'
         ;;
 
@@ -109,7 +93,7 @@ case "$cmd" in
         # Lock down MCU-driven SD swaps for the duration of the update window:
         # neither a hang during the spare-image write (watchdog) nor an
         # unrelated power blip (power-cycle) may flip the routing. The only
-        # legitimate routing change is the explicit set_try_next write below.
+        # legitimate routing change is the explicit set_try_next write above.
         printf '0\n' > "$WATCHDOG_SD_SWITCH"
         printf '0\n' > "$POWER_SD_SWITCH"
         printf '{}\n'
@@ -123,16 +107,15 @@ case "$cmd" in
         # Trigger an MCU-driven power cycle of the CM. The MCU waits
         # power/down_delay_config seconds, powers the CM off, applies
         # sd_main_routing_config to the matrix, then powers the CM back on.
-        # The script returns immediately; the actual reboot happens after
-        # the configured delay.
         #
         # The application is expected to keep the watchdog running across
         # the update window, but we re-assert it here so that the rollback
         # safety net is guaranteed armed before we cut power: if the new
         # system fails to come up and resume heartbeats, the MCU will roll
-        # back via watchdog/sd_switch_config (set to 1 in set_try_next).
-        printf '1\n' > "$WATCHDOG_ENABLED"
+        # back via watchdog/sd_switch_config (set by set_try_next).
         sync
+        printf '1\n' > "$WATCHDOG_ENABLED"
+        printf '1\n' > "$WATCHDOG_ENABLED_CONFIG"
         printf '1\n' > "$POWER_DOWN_ENABLED"
         shutdown now
         printf '{}\n'
