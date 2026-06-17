@@ -1,13 +1,9 @@
-# Rugix Strato Pi Template
+# Rugix Example Integration for Strato Pi
 
-Rugix Bakery template for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max/)
-family of edge servers. Builds ready-to-flash images with over-the-air update
-support via [Rugix](https://rugix.org).
+This repository contains a Rugix example integration for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max/) family of edge servers. It allows you to **build read-to-flash images with robust OTA update support**. In addition, it provides an optional ready-made integration with [Nexigon](https://nexigon.cloud) to manage and orchestrate your edge devices at scale.
 
 > [!NOTE]
-> This template is a proof of concept demonstrating how to integrate Rugix with
-> Strato Pi's dual SD card switching mechanism and watchdog. If you're interested
-> in using this in production please contact [Silitics](https://silitics.com).
+> **Support:** This repository is subject to [Tier 3: Example Integrations](https://rugix.org/support-commitment/#tier-example-integration) of our Support Commitment.
 
 ## System Images
 
