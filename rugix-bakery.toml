@@ -11,16 +11,6 @@ layer = "customized"
 architecture = "arm64"
 target = "rpi-tryboot"
 
-# This image includes a firmware update for the Raspberry Pi 4 family.
-#
-# Compatible with:
-# - Raspberry Pi 4
-# - Raspberry Pi CM4
-[systems.rpi-tryboot-pi4]
-layer = "customized-pi4"
-architecture = "arm64"
-target = "rpi-tryboot"
-
 # Strato Pi with dual SD card switching matrix.
 [systems.stratopi-dual-sd]
 layer = "customized-dual-sd"
