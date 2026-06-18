@@ -1,20 +1,78 @@
 # Rugix Example Integration for Strato Pi Max
 
 This repository provides a template that you can adapt to build ready-to-flash system
-images for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max/) family of edge servers with Rugix.
+images for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max/) family of edge servers with [Rugix](https://rugix.org).
 Rugix is a toolkit for building embedded Linux systems and updating them in the
-field. The integration provides **fault-tolerant A/B OTA update support**
+field. This integration provides **fault-tolerant A/B OTA update support**
 through Raspberry Pi's tryboot mechanism and Strato Pi Max's dual-SD failover for full
 boot-medium redundancy. It also ships with an optional ready-made
 [Nexigon](https://nexigon.cloud) integration for orchestrating fleet-wide OTA
 updates and remote device access.
 
+With this template you get:
+
+- CI/CD-compatible declarative image building pipeline.
+- Fault tolerant A/B system updates with watchdog-driven rollback.
+- SBOM generation for compliance, e.g., with the Cyber Resilience Act.
+- Fault-tolerant [application updates](https://rugix.org/docs/ctrl/application-management/), e.g., of Docker Compose stacks.
+- [Managed system state](https://rugix.org/docs/ctrl/state-management/) for robustness and easy factory resets.
+- Integration with [Nexigon](https://nexigon.cloud) for end-to-end device management.
+
+If you are new to Rugix, check out the [Getting Started Guide](https://rugix.org/docs/getting-started/) for a general introduction.
+
 > [!NOTE]
 > **Support:** This repository is subject to [Tier 3: Example Integrations](https://rugix.org/support-commitment/#tier-example-integration) of our Support Commitment.
 
+## Quick Start
+
+The build runs in a container and requires Linux or macOS with Docker or Podman
+installed.
+
+Clone this repository and enter it:
+
+```sh
+git clone https://github.com/rugix/rugix-example-stratopi.git
+cd rugix-example-stratopi
+```
+
+Pick one of the available systems:
+
+- `rpi-tryboot`: single boot medium, simplest setup, suitable for first tests.
+- `stratopi-dual-sd`: dual SD card failover, for full boot-medium redundancy.
+
+Build an image and update bundle:
+
+```sh
+./run-bakery bake bundle rpi-tryboot
+```
+
+or:
+
+```sh
+./run-bakery bake bundle stratopi-dual-sd
+```
+
+The image and update bundle are written to `build/<system>/`. Flash
+`system.img` to the target boot medium and boot the Strato Pi Max. For the dual
+SD card update strategy, flash the same `system.img` to both SD cards and insert
+both cards into the Strato Pi Max.
+
+To install an update, connect to the Strato Pi Max via SSH. The demo image allows
+root password login with the default password `rugix`; change or remove the
+`demo-ssh-root` recipe before using it outside throwaway testing. Transfer the
+update bundle (`.rugixb` file) and install it:
+
+```sh
+rugix-ctrl update install --insecure-skip-bundle-verification system.rugixb
+```
+
+We use `--insecure-skip-bundle-verification` here as the bundle is not signed.
+For production environments, we recommend setting up
+[signed updates](https://rugix.org/docs/ctrl/updates/signed-updates/).
+
 ## System Images
 
-The template provides two system image types targeting different update
+This template provides two system image types targeting different update
 strategies: Raspberry Pi's tryboot mechanism and Strato Pi's dual SD card
 failover. Both share a common base layer with the Strato Pi Max kernel module,
 PCF2131 RTC driver, watchdog, power-cycle reboot helper, and device
@@ -49,14 +107,20 @@ cycle. If the new system boots successfully, the switch is permanent. If the
 watchdog expires, the MCU automatically reverts to the other card.
 
 This setup requires the `stratopi-max-dual-sd-boot` recipe and uses a custom Rugix
-system configuration with `boot-flow.type = "custom"`.
+system configuration and [boot flow](https://rugix.org/docs/ctrl/updates/system-updates/boot-flows/) with `boot-flow.type = "custom"`. With this approach, an update is auto-committed upon installation and a watchdog-driven fallback to the previous version is possible at all times (details below).
 
 ## How It Works
+
+The Strato Pi-specific recipes adapt the Debian/Raspberry Pi base image for the
+Strato Pi Max hardware. They build and install the Strato Pi Max kernel module
+and PCF2131 RTC driver, configure the MCU watchdog, install a power-cycle reboot
+helper, create stable device symlinks for the SD card slots, and, for the dual
+SD image, install a custom Rugix boot-flow controller that talks to the MCU.
 
 ### Watchdog
 
 The Strato Pi MCU runs a hardware watchdog that the CM has to feed over sysfs.
-Configuration lives at `/sys/class/stratopimax/watchdog/`:
+Configuration of the hardware watchdog lives at `/sys/class/stratopimax/watchdog/`:
 
 - `enabled` / `enabled_config`: enable the watchdog at runtime / on next power-up.
 - `timeout` / `timeout_config`: maximum gap between heartbeats before the MCU
@@ -66,18 +130,19 @@ Configuration lives at `/sys/class/stratopimax/watchdog/`:
   the SD routing matrix (`0` = no swap, `1` = swap on every reset, `N>1` = swap
   after N consecutive resets).
 
-`stratopi-max-watchdog` writes the persistent (`*_config`) values once at boot via
-`configure-watchdog.service`, then `kick-watchdog.timer` resets the runtime timer
-every 5 seconds for as long as the system is healthy. If userspace stops kicking
-the watchdog (because the system hung, panicked, or never finished booting), the
-MCU power-cycles the CM after `timeout + down_delay_config` seconds.
+The `stratopi-max-watchdog` recipe installs two Systemd services:
+`configure-watchdog` and `kick-watchdog` (timer triggered). `configure-watchdog`
+writes the persistent (`*_config`) values and enables the watchdog at boot. The
+`kick-watchdog` service resets the watchdog every 5 seconds for as long as the
+system is healthy. If userspace stops kicking the watchdog (because the system hung,
+panicked, or never finished booting), the MCU power-cycles the CM after
+`timeout + down_delay_config` seconds.
 
 > [!NOTE]
 > The shipped heartbeat is unconditional: as long as systemd is alive, the MCU
 > stays happy. In production you will usually want the kick to depend on an
-> application-level health check (e.g., the workload's own liveness endpoint or
-> a dependent service's status), so that a wedged application, not just a
-> wedged kernel, also triggers recovery.
+> application-level health check (e.g., the workload's own liveness endpoint),
+> so that a wedged application, not just a wedged kernel, also triggers recovery.
 
 ### Update Flow (Dual SD)
 
@@ -88,11 +153,10 @@ A successful update walks through five steps:
    a hang during the spare-image write nor an unrelated power blip may flip the
    SD routing; the only legitimate routing change is the explicit one made in
    step 3.
-2. **Bundle write**: `rugix-ctrl` writes the new system to the inactive group's
-   block device (the SD card *not* currently routed as main).
-3. **`set_try_next`**: set `watchdog/sd_switch_config = N` (arm rollback) and
-   write the target letter to `sd/sd_main_routing_config`. Here `N` is configurable
-   through the `watchdog_sd_switch_config` parameter (default: `3`).
+2. **Bundle write**: write the new system to the inactive SD card.
+3. **`set_try_next`**: set `watchdog/sd_switch_config = N` (to arm the rollback
+   after `N` consecutive watchdog resets) and switch over to the inactive SD
+   card by setting `sd/sd_main_routing_config`. Here `N` is configurable through the `watchdog_sd_switch_config` parameter (default: `3`).
 4. **`reboot`**: write `1` to `power/down_enabled` and `shutdown now`. The MCU
    waits `down_delay_config` seconds, cuts power, applies `sd_main_routing_config`,
    and powers the CM back on from the new card.
@@ -118,8 +182,9 @@ so the device recovers without human intervention.
 >   *previous* version, and design the application (and any persistent state
 >   format) so that running an older release is safe.
 >
-> Setting `watchdog_sd_switch_config = 0` disables this safety net entirely and
-> matches Rugix's usual "no rollback after commit" model.
+> Alternatively, your application may set `watchdog/sd_switch_config = 0` after
+> a successful update to disable watchdog-driven rollbacks outside of the update
+> window.
 
 ### Application Responsibilities
 
@@ -128,48 +193,54 @@ don't make any policy decisions about *when* an update should happen or
 *whether* the new system is healthy enough to keep. That is up to the
 application running on the device:
 
-- **Triggering updates.** Steps 1 to 4 of the update flow are kicked off by
-  `rugix-ctrl update install <bundle-url>`. Without an OTA recipe enabled,
+- **Triggering updates.** The update flow is kicked off by
+  `rugix-ctrl update install <bundle-url>`. Without a fleet-management integration,
   nothing on the device calls this on its own; the application (or an
   operator) decides when to fetch and install a bundle.
 - **Forcing a rollback.** If the application determines the new system is
   *not* healthy and can't be salvaged, it can short-circuit the watchdog
   by calling `rugix-ctrl system reboot --spare` to immediately reboot
-  into the previous group, instead of waiting for the watchdog timeout.
+  into the inactive version, instead of waiting for the watchdog timeout.
 - **Gating the heartbeat.** As noted above, the shipped heartbeat is
   unconditional. Production deployments must replace or wrap
   `kick-watchdog` so it only kicks when the application reports itself
   healthy. That way a wedged workload, not just a wedged kernel,
-  triggers a watchdog-driven reboot (and, during an update window, a
-  rollback).
-
-## Building
-
-```
-RUGIX_VERSION=branch-main ./run-bakery bake bundle <system>
-```
-
-The built image and update bundle will be in `build/`.
-
-Available systems are:
-
-- `rpi-tryboot`
-- `stratopi-dual-sd`
+  triggers a watchdog-driven rollback/reboot.
 
 ## Nexigon Integration
 
-For fleet-wide update orchestration and remote device access, this template
-ships with a ready-made [Nexigon](https://nexigon.cloud) integration.
+Rugix handles updates and state management on the device, but once devices are
+deployed in the field you still need a way to manage them remotely: roll out
+updates, monitor their health, access them for maintenance, and coordinate
+configuration at scale. Rugix deliberately does not prescribe how update bundles
+reach a device. A local operator, an application-specific backend, or a fleet
+management platform can all ask `rugix-ctrl` to install an update.
+This keeps the on-device update mechanism independent of any particular cloud or
+deployment workflow.
 
-The Nexigon agent recipes in `layers/customized.toml` require configuration.
-Copy `env.template` to `.env` first and fill in the matching values. The
-`nexigon-agent-config` recipe sources `.env` at bake time to bake
-`NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into `/etc/nexigon/agent.toml`.
+For a ready-made fleet-management path, this template ships with a
+[Nexigon](https://nexigon.cloud) integration. Nexigon is designed to work with
+Rugix end to end and provides OTA update orchestration, remote device access,
+telemetry, monitoring, and audit logging for production fleets.
+
+This repository includes release helper scripts for the Nexigon workflow. They
+prepare a Nexigon package version, build one or more systems with the Nexigon
+integration enabled, upload the generated artifacts, and promote a build to a
+stable release for deployment.
+
+The Nexigon integration itself lives in `mixins/nexigon.toml` (Rugix Bakery mixin);
+the release scripts enable it with `--enable-mixin nexigon`. If you are setting up Nexigon
+from scratch, follow the [Nexigon Rugix quickstart
+guide](https://docs.nexigon.dev/rugix/getting-started/) to create the required
+Nexigon organization and deployment token. Then copy `env.template` to `.env` and
+fill in the matching values. The `nexigon-agent-config` recipe sources `.env` at
+bake time to bake `NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into
+`/etc/nexigon/agent.toml`.
 
 ### Nexigon Releases
 
-The release scripts are based on the Nexigon Rugix template and share state
-through `.release-env`, so the generated version is used consistently by each
+The release scripts are based on the [Nexigon Rugix template](https://github.com/nexigon/nexigon-rugix-template)
+and share state through `.release-env`, so the generated version is used consistently by each
 step.
 
 1. Configure `.env`:
@@ -193,7 +264,7 @@ step.
 3. Build one or more systems with the pinned release version:
 
    ```
-   ./scripts/build-release.sh rpi-tryboot rpi-tryboot-pi4 stratopi-dual-sd
+   ./scripts/build-release.sh rpi-tryboot stratopi-dual-sd
    ```
 
    Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
@@ -218,12 +289,14 @@ step.
 The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
 if the CLI is not on `PATH`.
 
-The scripts publish OTA-ready bundles, but they do not enable device-side
-polling or automatic installation. If you want devices to poll Nexigon and
-install `stable` automatically, review the `nexigon/nexigon-rugix-ota` recipe
-and its commit policy before enabling it.
+Release builds enable `mixins/nexigon.toml`, including
+[`nexigon/nexigon-rugix-ota`](https://github.com/nexigon/nexigon-rugix/tree/main/recipes/nexigon-rugix-ota) for device-side polling and installation. Review that
+recipe and its commit policy before deploying automatic updates to production
+devices.
 
-## Recipes
+## Recipe Reference
+
+This section documents the recipes provided by this template.
 
 ### stratopi-max-kernel-module
 
@@ -277,12 +350,10 @@ tells the MCU to initiate a power-down, and then shuts down the OS.
 Creates `/dev/stratopi/sda`, `/dev/stratopi/sdb` and partition symlinks
 (`sda1`, `sda2`, `sdb1`, `sdb2`, ...) that map the Strato Pi's SD card slots to
 their actual block devices. The mapping is derived from the MCU's SD routing
-sysfs and the root filesystem's block device.
-
-A systemd service creates the symlinks at boot, and a udev rule re-triggers it
-whenever mmcblk devices are added, removed, or repartitioned. The script also
-ensures both SD interfaces are enabled in the MCU (runtime and persistent
-config).
+sysfs and the root filesystem's block device. A systemd service creates the
+symlinks at boot, and a udev rule re-triggers it whenever mmcblk devices are
+added, removed, or repartitioned. The script also ensures both SD interfaces
+are enabled in the MCU (runtime and persistent config).
 
 ### stratopi-max-dual-sd-boot
 
@@ -293,18 +364,33 @@ slot via the normalized device symlinks.
 
 The boot flow controller communicates with the MCU via sysfs to:
 
-- Query and set the active SD card routing
-- Arm the watchdog for rollback on update
-- Trigger MCU power cycles to switch cards
-- Commit successful boots by disarming the watchdog
+- Query and set the active SD card routing.
+- Arm the watchdog for rollback on update.
+- Trigger MCU power cycles to switch cards.
+- Commit successful boots by confirming the SD routing and reapplying the.
+  configured watchdog failover policy.
 
 Parameters:
 
 - `system_size`: target size of the system partition, grown on first boot
   (default: `2GiB`)
 - `watchdog_sd_switch_config`: value written to `watchdog/sd_switch_config`
-  as part of an update, i.e. the number of consecutive watchdog resets the MCU
-  tolerates before swapping the SD routing. This MUST be `>0` to ensure that
+  by the dual-SD boot flow, i.e. the number of consecutive watchdog resets the
+  MCU tolerates before swapping the SD routing. This MUST be `>0` to ensure that
   a bad update triggers a fallback to the old version.
 
 Depends on `stratopi-max-normalized-devices`.
+
+## Commercial Support
+
+Rugix has been created and is maintained by [Silitics](https://silitics.com). Looking for commercial support? [We're here to help.](https://rugix.org/commercial-support) Need a fleet management solution? Check out [Nexigon](https://nexigon.cloud), by the creators of Rugix.
+
+## Licensing
+
+This project is licensed under either [MIT](https://github.com/rugix/rugix/blob/main/LICENSE-MIT) or [Apache 2.0](https://github.com/rugix/rugix/blob/main/LICENSE-APACHE) at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you, as defined in the Apache 2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+---
+
+Made with ❤️ for OSS by [Silitics](https://www.silitics.com)
