@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+if ! [[ "${RECIPE_PARAM_WATCHDOG_SD_SWITCH_CONFIG}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[ERROR] watchdog_sd_switch_config must be an integer > 0, got '${RECIPE_PARAM_WATCHDOG_SD_SWITCH_CONFIG}'" >&2
+    exit 1
+fi
+
 # Boot flow controller and the runtime Rugix system configuration.
 mkdir -p /usr/lib/stratopi
 sed "s|@WATCHDOG_SD_SWITCH_CONFIG@|${RECIPE_PARAM_WATCHDOG_SD_SWITCH_CONFIG}|g" \
