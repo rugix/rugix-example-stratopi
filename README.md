@@ -23,6 +23,11 @@ If you are new to Rugix, check out the [Getting Started Guide](https://rugix.org
 > [!NOTE]
 > **Support:** This repository is subject to [Tier 3: Example Integrations](https://rugix.org/support-commitment/#tier-example-integration) of our Support Commitment.
 
+> [!CAUTION]
+> The examples in this repository are provided for demonstration purposes. As such, they may rely
+> on insecure default configarations (hardcoded credentials, exposed services, …) to make it easy
+> to get started. **Do not use the provided examples in production without proper hardening.**
+
 ## Quick Start
 
 The build runs in a container and requires Linux or macOS with Docker or Podman
