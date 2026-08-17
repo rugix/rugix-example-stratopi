@@ -20,9 +20,6 @@ With this template you get:
 
 If you are new to Rugix, check out the [Getting Started Guide](https://rugix.org/docs/getting-started/) for a general introduction.
 
-> [!NOTE]
-> **Support:** This repository is covered by [Tier 3: Example Integration](https://rugix.org/support-commitment/#tier-example-integration) of the Rugix Support Commitment.
-
 > [!CAUTION]
 > The examples in this repository are provided for demonstration purposes. As such, they may rely
 > on insecure default configurations (hardcoded credentials, exposed services, …) to make it easy
@@ -382,6 +379,12 @@ Parameters:
   a bad update triggers a fallback to the old version.
 
 Depends on `stratopi-max-normalized-devices`.
+
+## Support
+
+This repository is covered by
+[Tier 3: Example Integration](https://rugix.org/support-commitment/#tier-example-integration)
+of the Rugix Support Commitment.
 
 ## Commercial Support
 
