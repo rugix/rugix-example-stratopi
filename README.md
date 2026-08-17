@@ -2,17 +2,17 @@
 
 This repository provides a template that you can adapt to build ready-to-flash system
 images for the [Strato Pi Max](https://sferalabs.cc/strato-pi-max/) family of edge servers with [Rugix](https://rugix.org).
-Rugix is a toolkit for building embedded Linux systems and updating them in the
-field. This integration provides **fault-tolerant A/B OTA update support**
+Rugix is an open-source toolkit for building and maintaining robust
+Linux-powered products. This integration provides **fault-tolerant A/B OTA update support**
 through Raspberry Pi's tryboot mechanism and Strato Pi Max's dual-SD failover for full
-boot-medium redundancy. It also ships with an optional ready-made
-[Nexigon](https://nexigon.cloud) integration for orchestrating fleet-wide OTA
-updates and remote device access.
+boot-medium redundancy. It also ships with an optional
+[Nexigon](https://nexigon.cloud) integration for remote access and fleet-wide
+update orchestration.
 
 With this template you get:
 
 - CI/CD-compatible declarative image building pipeline.
-- Fault tolerant A/B system updates with watchdog-driven rollback.
+- Fault-tolerant A/B system updates with watchdog-driven rollback.
 - SBOM generation for compliance, e.g., with the Cyber Resilience Act.
 - Fault-tolerant [application updates](https://rugix.org/docs/ctrl/application-management/), e.g., of Docker Compose stacks.
 - [Managed system state](https://rugix.org/docs/ctrl/state-management/) for robustness and easy factory resets.
@@ -21,11 +21,11 @@ With this template you get:
 If you are new to Rugix, check out the [Getting Started Guide](https://rugix.org/docs/getting-started/) for a general introduction.
 
 > [!NOTE]
-> **Support:** This repository is subject to [Tier 3: Example Integrations](https://rugix.org/support-commitment/#tier-example-integration) of our Support Commitment.
+> **Support:** This repository is covered by [Tier 3: Example Integration](https://rugix.org/support-commitment/#tier-example-integration) of the Rugix Support Commitment.
 
 > [!CAUTION]
 > The examples in this repository are provided for demonstration purposes. As such, they may rely
-> on insecure default configarations (hardcoded credentials, exposed services, …) to make it easy
+> on insecure default configurations (hardcoded credentials, exposed services, …) to make it easy
 > to get started. **Do not use the provided examples in production without proper hardening.**
 
 ## Quick Start
@@ -214,18 +214,15 @@ application running on the device:
 
 ## Nexigon Integration
 
-Rugix handles updates and state management on the device, but once devices are
-deployed in the field you still need a way to manage them remotely: roll out
-updates, monitor their health, access them for maintenance, and coordinate
-configuration at scale. Rugix deliberately does not prescribe how update bundles
-reach a device. A local operator, an application-specific backend, or a fleet
-management platform can all ask `rugix-ctrl` to install an update.
-This keeps the on-device update mechanism independent of any particular cloud or
-deployment workflow.
+Rugix Ctrl installs updates and manages state on each device. Fleet-wide
+operations such as scheduling rollouts, monitoring health, remote maintenance,
+and configuration require an application backend or fleet management platform.
+A local operator or either kind of backend can ask `rugix-ctrl` to install an
+update.
 
 For a ready-made fleet-management path, this template ships with a
 [Nexigon](https://nexigon.cloud) integration. Nexigon is designed to work with
-Rugix end to end and provides OTA update orchestration, remote device access,
+Rugix Ctrl and provides OTA update orchestration, remote device access,
 telemetry, monitoring, and audit logging for production fleets.
 
 This repository includes release helper scripts for the Nexigon workflow. They
