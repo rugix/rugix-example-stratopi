@@ -19,7 +19,7 @@ recipes = [
 use_bundle_hash = true
 
 [parameters."nexigon/nexigon-agent"]
-version = "v0.5"
+version = "v0.6.0"
 
 [parameters."nexigon/nexigon-agent-config"]
 extra_config = """
