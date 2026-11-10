@@ -254,7 +254,7 @@ step.
 2. Prepare the Nexigon package version:
 
    ```
-   ./scripts/prepare-release.sh
+   mise run release:prepare
    ```
 
    This creates or reuses a version tagged as `build-<timestamp>-<commit>` and
@@ -263,7 +263,7 @@ step.
 3. Build one or more systems with the pinned release version:
 
    ```
-   ./scripts/build-release.sh rpi-tryboot stratopi-dual-sd
+   mise run build rpi-tryboot stratopi-dual-sd
    ```
 
    Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
@@ -273,7 +273,7 @@ step.
 4. Upload all build artifacts to Nexigon:
 
    ```
-   ./scripts/upload-release.sh
+   mise run release:upload
    ```
 
    The upload step checks `system-build-info.json` before publishing so stale
@@ -282,7 +282,7 @@ step.
 5. Promote the current branch build to the stable tag:
 
    ```
-   ./scripts/stabilize-release.sh
+   mise run release:stabilize
    ```
 
 The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
@@ -399,3 +399,21 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 ---
 
 Made with ❤️ for OSS by [Silitics](https://www.silitics.com)
+
+## Development Tasks
+
+Install Nix with flakes enabled and [mise](https://mise.jdx.dev/), then run
+`mise install` for the pinned Nexigon CLI. Mise selects Nix for Podman, jq,
+XZ, and SSH tools on x86-64 and AArch64 Linux. The host must support the
+container runtime used by
+Rugix Bakery. The release workflow is available through:
+
+```sh
+mise run release:prepare
+mise run build rpi-tryboot stratopi-dual-sd
+mise run release:upload
+```
+
+Use `mise run release:stabilize` to promote a prepared release and
+`mise run bakery -- <args>` for other Bakery commands. Mise calls the existing
+scripts in `scripts/`; the release and credential setup above still applies.

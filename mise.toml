@@ -1,0 +1,32 @@
+[tools]
+"github:nexigon/nexigon" = { version = "0.6.0", matching = "unknown-linux-musl.tar.gz", filter_bins = "nexigon-cli" }
+
+[tasks."bakery"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Run a Rugix Bakery command."
+run = "./run-bakery \"$@\""
+
+[tasks."build"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Build image and bundle artifacts for a prepared release."
+run = "bash scripts/build-release.sh \"$@\""
+
+[tasks."release:prepare"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Prepare a release version."
+run = "bash scripts/prepare-release.sh \"$@\""
+
+[tasks."release:upload"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Upload prepared release artifacts."
+run = "bash scripts/upload-release.sh \"$@\""
+
+[tasks."release:stabilize"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Promote an existing release."
+run = "bash scripts/stabilize-release.sh \"$@\""
+
+[tasks."release:run"]
+shell = "nix develop \"{{config_root}}\" --command bash -euo pipefail -c"
+description = "Run a prepared release."
+run = "bash scripts/run-release.sh \"$@\""
