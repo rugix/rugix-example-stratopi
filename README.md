@@ -402,11 +402,13 @@ Made with ❤️ for OSS by [Silitics](https://www.silitics.com)
 
 ## Development Tasks
 
-Install Nix with flakes enabled and [mise](https://mise.jdx.dev/), then run
-`mise install` for the pinned Nexigon CLI. Mise selects Nix for Podman, jq,
-XZ, and SSH tools on x86-64 and AArch64 Linux. The host must support the
-container runtime used by
-Rugix Bakery. The release workflow is available through:
+Install [mise](https://mise.jdx.dev/) for the convenience tasks. On x86-64
+and AArch64 Linux, `mise install` supplies the pinned Nexigon CLI for release
+helpers. Bakery commands use Docker or Podman on Linux or macOS. Release
+helpers also use installed host tools:
+Git and jq for release metadata, and XZ for image compression. On macOS,
+install Nexigon CLI separately to use release helpers. The release
+workflow is available through:
 
 ```sh
 mise run release:prepare
