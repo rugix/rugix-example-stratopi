@@ -238,9 +238,11 @@ bake time to bake `NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into
 
 ### Nexigon Releases
 
-The release scripts are based on the [Nexigon Rugix template](https://github.com/nexigon/nexigon-rugix-template)
-and share state through `.release-env`, so the generated version is used consistently by each
-step.
+Install [mise](https://mise.jdx.dev/), Git, jq, and XZ. Run `mise install`
+for Nexigon CLI on x86-64 or AArch64 Linux; on macOS, install Nexigon CLI
+separately. Builds use Docker or Podman as described in the quick start.
+
+The release steps share `.release-env` so each uses the same generated version.
 
 1. Configure `.env`:
 
@@ -285,8 +287,7 @@ step.
    mise run release:stabilize
    ```
 
-The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
-if the CLI is not on `PATH`.
+Set `NEXIGON_CLI=/path/to/nexigon-cli` if the CLI is not on `PATH`.
 
 Release builds enable `mixins/nexigon.toml`, including
 [`nexigon/nexigon-rugix-ota`](https://github.com/nexigon/nexigon-rugix/tree/main/recipes/nexigon-rugix-ota) for device-side polling and installation. Review that
@@ -399,23 +400,3 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 ---
 
 Made with ❤️ for OSS by [Silitics](https://www.silitics.com)
-
-## Development Tasks
-
-Install [mise](https://mise.jdx.dev/) for the convenience tasks. On x86-64
-and AArch64 Linux, `mise install` supplies the pinned Nexigon CLI for release
-helpers. Bakery commands use Docker or Podman on Linux or macOS. Release
-helpers also use installed host tools:
-Git and jq for release metadata, and XZ for image compression. On macOS,
-install Nexigon CLI separately to use release helpers. The release
-workflow is available through:
-
-```sh
-mise run release:prepare
-mise run build rpi-tryboot stratopi-dual-sd
-mise run release:upload
-```
-
-Use `mise run release:stabilize` to promote a prepared release and
-`mise run bakery -- <args>` for other Bakery commands. Mise calls the existing
-scripts in `scripts/`; the release and credential setup above still applies.
