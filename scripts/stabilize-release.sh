@@ -6,6 +6,7 @@
 #   ./scripts/stabilize-release.sh
 
 set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
 # shellcheck source=/dev/null
 . .env

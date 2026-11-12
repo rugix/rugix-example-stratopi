@@ -6,6 +6,7 @@
 #   ./scripts/run-release.sh <system>
 
 set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
 if [ ! -f .release-env ]; then
     echo "[ERROR] .release-env not found; run ./scripts/prepare-release.sh first"

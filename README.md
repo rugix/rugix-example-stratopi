@@ -238,9 +238,11 @@ bake time to bake `NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into
 
 ### Nexigon Releases
 
-The release scripts are based on the [Nexigon Rugix template](https://github.com/nexigon/nexigon-rugix-template)
-and share state through `.release-env`, so the generated version is used consistently by each
-step.
+Install [mise](https://mise.jdx.dev/), Git, jq, and XZ. Run `mise install`
+for Nexigon CLI on x86-64 or AArch64 Linux; on macOS, install Nexigon CLI
+separately. Builds use Docker or Podman as described in the quick start.
+
+The release steps share `.release-env` so each uses the same generated version.
 
 1. Configure `.env`:
 
@@ -254,7 +256,7 @@ step.
 2. Prepare the Nexigon package version:
 
    ```
-   ./scripts/prepare-release.sh
+   mise run release:prepare
    ```
 
    This creates or reuses a version tagged as `build-<timestamp>-<commit>` and
@@ -263,7 +265,7 @@ step.
 3. Build one or more systems with the pinned release version:
 
    ```
-   ./scripts/build-release.sh rpi-tryboot stratopi-dual-sd
+   mise run build rpi-tryboot stratopi-dual-sd
    ```
 
    Each build produces an image, update bundle, bundle hash, CycloneDX SBOM,
@@ -273,7 +275,7 @@ step.
 4. Upload all build artifacts to Nexigon:
 
    ```
-   ./scripts/upload-release.sh
+   mise run release:upload
    ```
 
    The upload step checks `system-build-info.json` before publishing so stale
@@ -282,11 +284,10 @@ step.
 5. Promote the current branch build to the stable tag:
 
    ```
-   ./scripts/stabilize-release.sh
+   mise run release:stabilize
    ```
 
-The scripts use `nexigon-cli` and `jq`. Set `NEXIGON_CLI=/path/to/nexigon-cli`
-if the CLI is not on `PATH`.
+Set `NEXIGON_CLI=/path/to/nexigon-cli` if the CLI is not on `PATH`.
 
 Release builds enable `mixins/nexigon.toml`, including
 [`nexigon/nexigon-rugix-ota`](https://github.com/nexigon/nexigon-rugix/tree/main/recipes/nexigon-rugix-ota) for device-side polling and installation. Review that
