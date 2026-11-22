@@ -1,0 +1,7 @@
+description = "enable system updates of Nexigon Agent for the package in .env"
+# Run after `nexigon/nexigon-agent-config`, which writes the agent configuration.
+priority = -1000
+
+[parameters]
+tag = { default = "stable" }
+use_bundle_hash = { default = "true" }
