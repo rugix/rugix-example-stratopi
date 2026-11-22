@@ -229,8 +229,8 @@ stable release for deployment.
 
 The Nexigon integration itself lives in `mixins/nexigon.toml` (Rugix Bakery mixin);
 the release scripts enable it with `--enable-mixin nexigon`. If you are setting up Nexigon
-from scratch, follow the [Nexigon Rugix quickstart
-guide](https://docs.nexigon.dev/rugix/getting-started/) to create the required
+from scratch, follow the [Nexigon guide for Rugix
+Bakery](https://docs.nexigon.dev/connect/rugix-bakery) to create the required
 Nexigon organization and deployment token. Then copy `env.template` to `.env` and
 fill in the matching values. The `nexigon-agent-config` recipe sources `.env` at
 bake time to bake `NEXIGON_HUB_URL` and `NEXIGON_TOKEN` into
@@ -249,9 +249,14 @@ The release steps share `.release-env` so each uses the same generated version.
    ```
    NEXIGON_HUB_URL="https://eu.nexigon.cloud"
    NEXIGON_TOKEN=<device-deployment-token>
-   NEXIGON_REPOSITORY=<repository-id>
+   NEXIGON_REPOSITORY=<repository-path-name-or-id>
    NEXIGON_PACKAGE=<package-name>
+   NEXIGON_ORGANIZATION=<organization-id>
    ```
+
+   Nexigon CLI needs `NEXIGON_ORGANIZATION`, the ID of the organization that
+   owns the repository, when it authenticates with a user token. An
+   organization API token selects its own organization.
 
 2. Prepare the Nexigon package version:
 
@@ -289,14 +294,30 @@ The release steps share `.release-env` so each uses the same generated version.
 
 Set `NEXIGON_CLI=/path/to/nexigon-cli` if the CLI is not on `PATH`.
 
-Release builds enable `mixins/nexigon.toml`, including
-[`nexigon/nexigon-rugix-ota`](https://github.com/nexigon/nexigon-rugix/tree/main/recipes/nexigon-rugix-ota) for device-side polling and installation. Review that
-recipe and its commit policy before deploying automatic updates to production
+Release builds enable `mixins/nexigon.toml`. Its `nexigon-system-updates` recipe
+enables the [system updates](https://docs.nexigon.dev/agent/concepts/system-updates)
+of Nexigon Agent, so devices install new releases of the package in `.env`.
+Nexigon Agent commits a new system once it connects to Nexigon Hub, and
+`nexigon/nexigon-rugix-watchdog` rolls back a new system that it does not
+commit. Review this policy before deploying automatic updates to production
 devices.
 
 ## Recipe Reference
 
 This section documents the recipes provided by this template.
+
+### nexigon-system-updates
+
+Enables the system updates of Nexigon Agent in `/etc/nexigon/agent.toml`.
+Devices follow the `tag` of the package that `NEXIGON_REPOSITORY` and
+`NEXIGON_PACKAGE` in `.env` name. Without them, devices wait for the
+`dev.nexigon.ota.config` device property. The `nexigon` mixin includes it.
+
+Parameters:
+
+- `tag`: tag of the package that devices follow (default: `stable`)
+- `use_bundle_hash`: verify bundles with the hash from their metadata in
+  Nexigon Hub, `true` or `false` (default: `true`)
 
 ### stratopi-max-kernel-module
 

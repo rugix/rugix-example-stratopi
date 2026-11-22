@@ -23,6 +23,11 @@ fi
 
 NEXIGON_CLI="${NEXIGON_CLI:-nexigon-cli}"
 
+# A user token needs `--organization`; an organization API token selects its own.
+nexigon_cli() {
+    "$NEXIGON_CLI" ${NEXIGON_ORGANIZATION:+--organization "$NEXIGON_ORGANIZATION"} "$@"
+}
+
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 GIT_COMMIT=$(git rev-parse --short HEAD)
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -35,14 +40,14 @@ VERSION="$BUILD_TAG"
 PACKAGE_PATH="$NEXIGON_REPOSITORY/$NEXIGON_PACKAGE"
 VERSION_PATH="$PACKAGE_PATH/$BUILD_TAG"
 
-BUILD_VERSION_INFO=$($NEXIGON_CLI repositories versions resolve "$VERSION_PATH")
+BUILD_VERSION_INFO=$(nexigon_cli repositories versions resolve "$VERSION_PATH")
 if [ "$(echo "$BUILD_VERSION_INFO" | jq -r '.result')" = "Found" ]; then
     echo "[INFO] build version already exists, reusing it"
     VERSION_ID=$(echo "$BUILD_VERSION_INFO" | jq -r '.versionId')
 else
     echo "[INFO] creating build version"
     VERSION_METADATA=$(jq -nc --arg version "$VERSION" '{imageVersion: $version}')
-    VERSION_ID=$($NEXIGON_CLI repositories versions create "$PACKAGE_PATH" \
+    VERSION_ID=$(nexigon_cli repositories versions create "$PACKAGE_PATH" \
         --tag "$BUILD_TAG,locked" --tag "$FLOATING_TAG,reassign" \
         --metadata "$VERSION_METADATA" | jq -r '.versionId')
 fi

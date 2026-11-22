@@ -32,10 +32,15 @@ fi
 
 NEXIGON_CLI="${NEXIGON_CLI:-nexigon-cli}"
 
+# A user token needs `--organization`; an organization API token selects its own.
+nexigon_cli() {
+    "$NEXIGON_CLI" ${NEXIGON_ORGANIZATION:+--organization "$NEXIGON_ORGANIZATION"} "$@"
+}
+
 if [ -z "${VERSION_ID:-}" ]; then
     PACKAGE_PATH="$NEXIGON_REPOSITORY/$NEXIGON_PACKAGE"
     VERSION_PATH="$PACKAGE_PATH/$BUILD_TAG"
-    BUILD_VERSION_INFO=$($NEXIGON_CLI repositories versions resolve "$VERSION_PATH")
+    BUILD_VERSION_INFO=$(nexigon_cli repositories versions resolve "$VERSION_PATH")
     if [ "$(echo "$BUILD_VERSION_INFO" | jq -r '.result')" = "Found" ]; then
         VERSION_ID=$(echo "$BUILD_VERSION_INFO" | jq -r '.versionId')
     else
@@ -70,10 +75,10 @@ for build_dir in build/*; do
     SBOM_FILENAME="$SYSTEM_NAME.cdx.json"
     if [ -e "$IMG_PATH.xz" ]; then
         echo "[INFO] uploading '$SYSTEM_NAME' image"
-        asset_info=$($NEXIGON_CLI repositories assets upload "$NEXIGON_REPOSITORY" "$IMG_PATH.xz")
+        asset_info=$(nexigon_cli repositories assets upload "$NEXIGON_REPOSITORY" "$IMG_PATH.xz")
         asset_id=$(echo "$asset_info" | jq -r '.assetId')
         img_metadata=$(jq -nc --arg sbom "$SBOM_FILENAME" '{relations: {sbom: [$sbom]}}')
-        $NEXIGON_CLI repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.img.xz" \
+        nexigon_cli repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.img.xz" \
             --metadata "$img_metadata"
     fi
     BUNDLE_HASH=""
@@ -82,32 +87,32 @@ for build_dir in build/*; do
     fi
     if [ -e "$BUNDLE_PATH" ]; then
         echo "[INFO] uploading '$SYSTEM_NAME' bundle"
-        asset_info=$($NEXIGON_CLI repositories assets upload "$NEXIGON_REPOSITORY" "$BUNDLE_PATH")
+        asset_info=$(nexigon_cli repositories assets upload "$NEXIGON_REPOSITORY" "$BUNDLE_PATH")
         asset_id=$(echo "$asset_info" | jq -r '.assetId')
         bundle_metadata=$(jq -nc \
             --arg bundleHash "$BUNDLE_HASH" \
             --arg version "$VERSION" \
             --arg sbom "$SBOM_FILENAME" \
             '{rugix: {bundleHash: $bundleHash}, relations: {sbom: [$sbom]}, version: $version}')
-        $NEXIGON_CLI repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.rugixb" \
+        nexigon_cli repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.rugixb" \
             --metadata "$bundle_metadata"
     fi
     if [ -e "$BUNDLE_HASH_PATH" ]; then
         echo "[INFO] uploading '$SYSTEM_NAME' bundle hash"
-        asset_info=$($NEXIGON_CLI repositories assets upload "$NEXIGON_REPOSITORY" "$BUNDLE_HASH_PATH")
+        asset_info=$(nexigon_cli repositories assets upload "$NEXIGON_REPOSITORY" "$BUNDLE_HASH_PATH")
         asset_id=$(echo "$asset_info" | jq -r '.assetId')
-        $NEXIGON_CLI repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.rugixb-hash"
+        nexigon_cli repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.rugixb-hash"
     fi
     if [ -e "$SBOM_PATH" ]; then
         echo "[INFO] uploading '$SYSTEM_NAME' SBOM"
-        asset_info=$($NEXIGON_CLI repositories assets upload "$NEXIGON_REPOSITORY" "$SBOM_PATH")
+        asset_info=$(nexigon_cli repositories assets upload "$NEXIGON_REPOSITORY" "$SBOM_PATH")
         asset_id=$(echo "$asset_info" | jq -r '.assetId')
-        $NEXIGON_CLI repositories versions assets add "$VERSION_ID" "$asset_id" "$SBOM_FILENAME"
+        nexigon_cli repositories versions assets add "$VERSION_ID" "$asset_id" "$SBOM_FILENAME"
     fi
     if [ -e "$INFO_PATH" ]; then
         echo "[INFO] uploading '$SYSTEM_NAME' build info"
-        asset_info=$($NEXIGON_CLI repositories assets upload "$NEXIGON_REPOSITORY" "$INFO_PATH")
+        asset_info=$(nexigon_cli repositories assets upload "$NEXIGON_REPOSITORY" "$INFO_PATH")
         asset_id=$(echo "$asset_info" | jq -r '.assetId')
-        $NEXIGON_CLI repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.build-info.json"
+        nexigon_cli repositories versions assets add "$VERSION_ID" "$asset_id" "$SYSTEM_NAME.build-info.json"
     fi
 done

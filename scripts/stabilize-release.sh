@@ -30,7 +30,12 @@ fi
 . .release-env
 
 NEXIGON_CLI="${NEXIGON_CLI:-nexigon-cli}"
+
+# A user token needs `--organization`; an organization API token selects its own.
+nexigon_cli() {
+    "$NEXIGON_CLI" ${NEXIGON_ORGANIZATION:+--organization "$NEXIGON_ORGANIZATION"} "$@"
+}
 STABLE_TAG=${STABLE_TAG:-"stable"}
 PACKAGE_PATH="$NEXIGON_REPOSITORY/$NEXIGON_PACKAGE"
 
-$NEXIGON_CLI repositories versions tag "$PACKAGE_PATH/$FLOATING_TAG" --tag "${STABLE_TAG},reassign"
+nexigon_cli repositories versions tag "$PACKAGE_PATH/$FLOATING_TAG" --tag "${STABLE_TAG},reassign"

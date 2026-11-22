@@ -11,15 +11,14 @@ recipes = [
     "nexigon/nexigon-power",
     # Systemd service management commands.
     "nexigon/nexigon-systemd",
-    # Nexigon Rugix OTA Service.
-    "nexigon/nexigon-rugix-ota",
+    # Roll back a new system that Nexigon Agent does not commit.
+    "nexigon/nexigon-rugix-watchdog",
+    # System updates of Nexigon Agent for the package in `.env`.
+    "nexigon-system-updates",
 ]
 
-[parameters."nexigon/nexigon-rugix-ota"]
-use_bundle_hash = true
-
 [parameters."nexigon/nexigon-agent"]
-version = "v0.6.0"
+version = "v0.7.0"
 
 [parameters."nexigon/nexigon-agent-config"]
 extra_config = """
